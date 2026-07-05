@@ -1,0 +1,4 @@
+-- Bningoo Database Migrations
+-- Add migration SQL files here in order, e.g.:
+-- 00001_create_rls_policies.sql
+-- 00002_create_storage_buckets.sql
