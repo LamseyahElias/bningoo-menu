@@ -3,11 +3,12 @@
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button, Card, Badge, Input } from '@/components/ui'
 import { useCart } from '@/hooks/useCart'
 import { getGreeting, formatCurrency } from '@/lib/utils'
+import { useCategories, useMenuItems } from '@/hooks/useMenu'
+import type { MenuCategory, MenuItem } from '@/lib/services/menu-service'
 import {
   Search,
   ShoppingCart,
@@ -17,71 +18,37 @@ import {
   ArrowRight,
   Star,
   Flame,
+  User,
 } from 'lucide-react'
 import Link from 'next/link'
-import type { Category, Product, Formula } from '@/types'
 
 export default function MenuHome() {
-  const { user, loading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const router = useRouter()
-  const supabase = createClient()
   const { totalItems } = useCart()
+  const { categories, loading: catsLoading } = useCategories()
+  const { items, loading: itemsLoading } = useMenuItems()
 
-  const [categories, setCategories] = useState<Category[]>([])
-  const [featuredFormulas, setFeaturedFormulas] = useState<Formula[]>([])
-  const [popularItems, setPopularItems] = useState<(Product | Formula)[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [dataLoading, setDataLoading] = useState(true)
+
+  const dataLoading = catsLoading || itemsLoading
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       router.push('/auth/signin')
-      return
     }
-    if (user) {
-      loadData()
-    }
-  }, [user, loading])
+  }, [user, authLoading, router])
 
-  const loadData = async () => {
-    try {
-      // Load categories
-      const { data: cats } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order')
+  // Derive featured/popular from items
+  const featuredItems = items.filter(i => i.badges.includes('chef_choice')).slice(0, 4)
+  const popularItems = items.filter(i => i.badges.includes('best_seller')).slice(0, 6)
+  const filteredItems = items.filter(i => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return i.name.toLowerCase().includes(q) || (i.description || '').toLowerCase().includes(q)
+  })
 
-      if (cats) setCategories(cats)
-
-      // Load featured formulas
-      const { data: formulas } = await supabase
-        .from('formulas')
-        .select('*')
-        .eq('is_active', true)
-        .limit(6)
-
-      if (formulas) setFeaturedFormulas(formulas)
-
-      // Load products for popular items
-      const { data: products } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .eq('type', 'product')
-        .limit(6)
-
-      if (formulas && products) {
-        setPopularItems([...formulas.slice(0, 3), ...products.slice(0, 3)])
-      }
-    } catch (err) {
-      console.error('Error loading menu data:', err)
-    } finally {
-      setDataLoading(false)
-    }
-  }
-
-  if (loading || dataLoading) {
+  if (authLoading || dataLoading) {
     return <MenuSkeleton />
   }
 
@@ -103,16 +70,23 @@ export default function MenuHome() {
                 {user?.full_name?.split(' ')[0] || 'Guest'}
               </h1>
             </div>
-            <Link href="/menu/cart">
-              <div className="relative p-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors">
-                <ShoppingCart className="w-5 h-5 text-zinc-300" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-black text-xs font-bold rounded-full flex items-center justify-center">
-                    {totalItems > 9 ? '9+' : totalItems}
-                  </span>
-                )}
-              </div>
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link href="/menu/profile">
+                <div className="p-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors">
+                  <User className="w-5 h-5 text-zinc-300" />
+                </div>
+              </Link>
+              <Link href="/menu/cart">
+                <div className="relative p-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors">
+                  <ShoppingCart className="w-5 h-5 text-zinc-300" />
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-black text-xs font-bold rounded-full flex items-center justify-center">
+                      {totalItems > 9 ? '9+' : totalItems}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            </div>
           </motion.div>
 
           {/* Search */}
@@ -194,15 +168,15 @@ export default function MenuHome() {
           </div>
           <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
             <AnimatePresence>
-              {featuredFormulas.map((formula, i) => (
+              {featuredItems.map((item, i) => (
                 <motion.div
-                  key={formula.id}
+                  key={item.id}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.08 }}
                   className="min-w-[240px]"
                 >
-                  <Link href={`/menu/product/${formula.id}?type=formula`}>
+                  <Link href={`/menu/product/${item.id}`}>
                     <Card hover className="overflow-hidden">
                       <div className="h-32 bg-gradient-to-br from-amber-500/20 via-zinc-800 to-zinc-900 flex items-center justify-center relative">
                         <div className="absolute top-3 left-3">
@@ -210,16 +184,13 @@ export default function MenuHome() {
                             <Star className="w-3 h-3" /> Featured
                           </Badge>
                         </div>
-                        <span className="text-4xl opacity-30">{formula.name.charAt(0)}</span>
+                        <span className="text-4xl opacity-30">{item.name.charAt(0)}</span>
                       </div>
                       <div className="p-4">
-                        <h3 className="font-semibold text-white mb-1">{formula.name}</h3>
-                        <p className="text-xs text-zinc-500 line-clamp-1 mb-3">{formula.description}</p>
+                        <h3 className="font-semibold text-white mb-1">{item.name}</h3>
+                        <p className="text-xs text-zinc-500 line-clamp-1 mb-3">{item.description}</p>
                         <div className="flex items-center justify-between">
-                          <span className="text-amber-400 font-bold">{formatCurrency(formula.price)}</span>
-                          {formula.crispy_price && (
-                            <span className="text-xs text-zinc-500">Crispy: {formatCurrency(formula.crispy_price)}</span>
-                          )}
+                          <span className="text-amber-400 font-bold">{formatCurrency(item.price)}</span>
                         </div>
                       </div>
                     </Card>
@@ -244,23 +215,20 @@ export default function MenuHome() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
                 >
-                  <Link href={`/menu/product/${item.id}?type=${'code' in item ? 'formula' : 'product'}`}>
+                  <Link href={`/menu/product/${item.id}`}>
                     <Card hover className="p-4 flex items-center gap-4">
                       <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-zinc-800 to-zinc-900 flex-shrink-0 flex items-center justify-center border border-zinc-700/50">
                         <span className="text-xl">{item.name.charAt(0)}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-white text-sm truncate">{item.name}</h3>
-                        {'description' in item && item.description && (
+                        {item.description && (
                           <p className="text-xs text-zinc-500 truncate">{item.description}</p>
                         )}
                         <div className="flex items-center gap-2 mt-1.5">
                           <span className="text-amber-400 font-semibold text-sm">
                             {formatCurrency(item.price)}
                           </span>
-                          {'code' in item && item.code && (
-                            <Badge variant="default" size="sm">#{item.code}</Badge>
-                          )}
                         </div>
                       </div>
                       <ArrowRight className="w-4 h-4 text-zinc-600 flex-shrink-0" />
