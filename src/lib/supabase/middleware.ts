@@ -36,12 +36,20 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone()
-    url.pathname = '/auth/signin'
+    url.pathname = '/login'
     url.searchParams.set('redirect', request.nextUrl.pathname)
     return NextResponse.redirect(url)
   }
 
   if (user && isAuthPage) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/menu'
+    return NextResponse.redirect(url)
+  }
+  
+  // Also redirect /login to /menu if already logged in (unless pending)
+  const isLoginPage = request.nextUrl.pathname === '/login' && !request.nextUrl.searchParams.has('pending')
+  if (user && isLoginPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/menu'
     return NextResponse.redirect(url)

@@ -15,7 +15,7 @@ function CallbackHandler() {
       
       if (error) {
         console.error('Auth callback error:', error)
-        router.push('/auth/signin')
+        router.push('/login')
         return
       }
 
@@ -23,7 +23,7 @@ function CallbackHandler() {
         // Check if user profile exists
         const { data: profile } = await supabase
           .from('users')
-          .select('*')
+          .select('is_active')
           .eq('id', session.user.id)
           .single()
 
@@ -37,18 +37,28 @@ function CallbackHandler() {
               full_name: session.user.user_metadata.full_name || null,
               avatar_url: session.user.user_metadata.avatar_url || null,
               role: 'customer',
-              is_active: true,
+              is_active: false,  // New users start unapproved
             } as any)
 
           if (insertError) {
             console.error('Profile creation error:', insertError)
           }
+
+          // New user — not approved yet, show pending screen
+          router.push('/login?pending=true')
+          return
+        }
+
+        // Check if user is approved (is_active = true)
+        if (!profile.is_active) {
+          router.push('/login?pending=true')
+          return
         }
 
         const redirectTo = searchParams.get('redirect') || '/menu'
         router.push(redirectTo)
       } else {
-        router.push('/auth/signin')
+        router.push('/login')
       }
     }
 
