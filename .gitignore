@@ -39,3 +39,5 @@ install-deps.py
 preload-dns.cjs
 source-env.sh
 .env*.local
+
+.env*
