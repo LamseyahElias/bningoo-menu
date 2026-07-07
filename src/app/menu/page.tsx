@@ -35,7 +35,7 @@ export default function MenuHome() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/auth/signin')
+      router.push('/login')
     }
   }, [user, authLoading, router])
 

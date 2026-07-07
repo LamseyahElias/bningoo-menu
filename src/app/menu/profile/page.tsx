@@ -33,7 +33,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/auth/signin')
+      router.push('/login')
       return
     }
     if (user) {
@@ -54,7 +54,7 @@ export default function ProfilePage() {
 
   const handleSignOut = async () => {
     await signOut()
-    router.push('/auth/signin')
+    router.push('/login')
     toast.success('Signed out successfully')
   }
 

@@ -12,7 +12,7 @@ function CallbackHandler() {
     const handleCallback = async () => {
       const supabase = createClient()
       const { data: { session }, error } = await supabase.auth.getSession()
-      
+
       if (error) {
         console.error('Auth callback error:', error)
         router.push('/login')
@@ -20,17 +20,18 @@ function CallbackHandler() {
       }
 
       if (session?.user) {
-        // Check if user profile exists
+        // Check if user profile exists in profiles table
+        // The profiles table is auto-populated by a DB trigger on auth.users insert
         const { data: profile } = await supabase
-          .from('users')
+          .from('profiles')
           .select('is_active')
           .eq('id', session.user.id)
           .single()
 
         if (!profile) {
-          // Create user profile from auth metadata
+          // Profile doesn't exist yet — try inserting one
           const { error: insertError } = await supabase
-            .from('users')
+            .from('profiles')
             .insert({
               id: session.user.id,
               email: session.user.email!,
@@ -50,7 +51,8 @@ function CallbackHandler() {
         }
 
         // Check if user is approved (is_active = true)
-        if (!profile.is_active) {
+        const isApproved = (profile as any).is_active
+        if (!isApproved) {
           router.push('/login?pending=true')
           return
         }

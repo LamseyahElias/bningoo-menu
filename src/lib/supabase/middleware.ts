@@ -28,8 +28,8 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   // Protected routes
-  const protectedPaths = ['/menu', '/admin', '/kitchen']
-  const isProtected = protectedPaths.some(p => request.nextUrl.pathname.startsWith(p))
+  const protectedPaths = ['/menu', '/admin', '/kitchen', '/cart', '/orders', '/profile']
+  const isProtected = protectedPaths.some(p => request.nextUrl.pathname === p || request.nextUrl.pathname.startsWith(p + '/'))
 
   // Auth pages
   const isAuthPage = request.nextUrl.pathname.startsWith('/auth')
